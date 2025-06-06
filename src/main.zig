@@ -48,7 +48,7 @@ fn printUsage(arg0: []const u8) !void {
     const stderr = std.io.getStdErr();
 
     try stderr.writer().print(
-        \\usage: {s} <code file> [-ab]
+        \\usage: {s} <code file> [-b]
         \\
         \\flags:
         \\  -b        print output as bytes
@@ -102,7 +102,7 @@ const ActiveCommands = struct {
     }
 };
 
-const Mode = enum {
+const Mode = enum(u1) {
     pc,
     mp,
 };
@@ -144,11 +144,7 @@ fn interpret(code_file: std.fs.File, byte_output: bool, allocator: std.mem.Alloc
         active_commands = ActiveCommands.init(byte);
 
         if (active_commands.swap_mode) {
-            if (checkpoint_mode == .pc) {
-                checkpoint_mode = .mp;
-            } else {
-                checkpoint_mode = .pc;
-            }
+            checkpoint_mode = @enumFromInt(@intFromEnum(checkpoint_mode) -% 1);
         } else if (active_commands.increment_offset) {
             checkpoint_offset += 1;
         } else if (active_commands.decrement_offset) {
@@ -178,6 +174,7 @@ fn interpret(code_file: std.fs.File, byte_output: bool, allocator: std.mem.Alloc
                 entry.value_ptr.* = 1;
             }
         }
+
         if (active_commands.output_bit) {
             if (byte_output) {
                 output_byte <<= 1;
