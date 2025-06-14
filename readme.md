@@ -40,6 +40,6 @@
        +--- Set checkpoint with ID to PC/MP + offset
         |
         +-- If bit at MP is 1:
-              If in PC mode set PC to byte after checkpoint with ID
+              If in PC mode set PC to the checkpoint with ID
               If in MP mode set MP to the checkpoint with ID
 ```

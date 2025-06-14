@@ -286,14 +286,14 @@ fn interpret(
                 register.ptr = register.checkpoints.get(register.checkpoint_id) orelse
                     return error.UndefinedCheckpoint;
 
+                if (register.ptr < 0)
+                    return;
+
                 if (mode == .pc) {
-                    pc.ptr += 1;
-                    if (pc.ptr < 0) return;
                     try code_file.seekTo(@intCast(pc.ptr));
                     // flush the buffer of code from old location
                     buffered_code.end = buffered_code.start;
-                } else if (mp.ptr < 0)
-                    return;
+                }
             }
         }
     }
