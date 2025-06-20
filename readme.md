@@ -42,4 +42,7 @@
         +-- If bit at MP is 1:
               If in PC mode set PC to the checkpoint with ID
               If in MP mode set MP to the checkpoint with ID
+
+If all bits in an instruction are 0:
+  If bit at MP is 0, ignore the next instruction
 ```

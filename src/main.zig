@@ -57,6 +57,20 @@ const Instruction = packed struct(u8) {
         return instruction.increment_offset() and instruction.decrement_offset();
     }
 
+    const conditional: Instruction = .{
+        .increment_id = false,
+        .decrement_id = false,
+        .increment_mp = false,
+        .decrement_mp = false,
+
+        .flip_bit = false,
+
+        .output_bit = false,
+
+        .set_checkpoint = false,
+        .load_checkpoint = false,
+    };
+
     /// returns null on Eof
     fn read(reader: anytype) !?Instruction {
         const byte = reader.readByte() catch |err| switch (err) {
@@ -73,43 +87,46 @@ const Instruction = packed struct(u8) {
         _: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        try writer.writeAll("Instruction{ ");
+        try writer.writeAll("instruction:");
         if (instruction.swap_mode()) {
-            try writer.writeAll("swap, ");
+            try writer.writeAll(" swap");
         } else if (instruction.increment_offset()) {
-            try writer.writeAll("offset+, ");
+            try writer.writeAll(" offset+");
         } else if (instruction.decrement_offset()) {
-            try writer.writeAll("offset-, ");
+            try writer.writeAll(" offset-");
         } else {
             if (instruction.increment_id) {
-                try writer.writeAll("id+, ");
+                try writer.writeAll(" id+");
             } else if (instruction.decrement_id) {
-                try writer.writeAll("id-, ");
+                try writer.writeAll(" id-");
             }
 
             if (instruction.increment_mp) {
-                try writer.writeAll("mp+, ");
+                try writer.writeAll(" mp+");
             } else if (instruction.decrement_id) {
-                try writer.writeAll("mp-, ");
+                try writer.writeAll(" mp-");
             }
         }
 
         if (instruction.flip_bit) {
-            try writer.writeAll("flip, ");
+            try writer.writeAll(" flip");
         }
 
         if (instruction.output_bit) {
-            try writer.writeAll("output, ");
+            try writer.writeAll(" output");
         }
 
         if (instruction.set_checkpoint) {
-            try writer.writeAll("set-checkpoint, ");
+            try writer.writeAll(" save");
         }
 
         if (instruction.load_checkpoint) {
-            try writer.writeAll("load-checkpoint, ");
+            try writer.writeAll(" load");
         }
-        try writer.writeAll("}");
+
+        if (instruction == conditional) {
+            try writer.writeAll(" cond");
+        }
     }
 };
 
@@ -221,12 +238,32 @@ fn interpret(
 
     var mode: Mode = .pc;
 
+    var skip_instruction: bool = false;
+
     var buffered_code = std.io.bufferedReader(code_file.reader());
     const code = buffered_code.reader();
 
     while (try Instruction.read(code)) |instruction| {
         if (log_instructions)
-            try stdout.print("{}\n", .{instruction});
+            try stdout.print("{s}{}\n", .{
+                if (skip_instruction)
+                    "skipped - "
+                else
+                    "",
+                instruction,
+            });
+
+        if (skip_instruction) {
+            skip_instruction = false;
+            continue;
+        }
+
+        if (instruction == Instruction.conditional) {
+            if (tape.isSet(@intCast(mp.ptr))) {
+                skip_instruction = true;
+            }
+            continue;
+        }
 
         if (instruction.swap_mode()) {
             mode = switch (mode) {
@@ -282,18 +319,16 @@ fn interpret(
             );
         }
         if (instruction.load_checkpoint) {
-            if (tape.isSet(@intCast(mp.ptr))) {
-                register.ptr = register.checkpoints.get(register.checkpoint_id) orelse
-                    return error.UndefinedCheckpoint;
+            register.ptr = register.checkpoints.get(register.checkpoint_id) orelse
+                return error.UndefinedCheckpoint;
 
-                if (register.ptr < 0)
-                    return;
+            if (register.ptr < 0)
+                return;
 
-                if (mode == .pc) {
-                    try code_file.seekTo(@intCast(pc.ptr));
-                    // flush the buffer of code from old location
-                    buffered_code.end = buffered_code.start;
-                }
+            if (mode == .pc) {
+                try code_file.seekTo(@intCast(pc.ptr));
+                // flush the buffer of code from old location
+                buffered_code.end = buffered_code.start;
             }
         }
     }
